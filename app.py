@@ -99,7 +99,7 @@ app_mode = st.sidebar.selectbox(
         "🏠 Home",
         "❄️ DX Evaporator Designer",
         "🔥 Condenser Designer (Standard)",
-        "🔬 Condenser Designer (Advanced Segment Model)",
+        "🔧 Condenser Designer (Professional)",
         "📚 Documentation"
     ]
 )
@@ -153,17 +153,17 @@ if app_mode == "🏠 Home":
         **Standard Method:**
         - Fast calculation
         - Area distribution method
-        - All TEMA compliance checks
+        - Shell-side refrigerant
         - Good for preliminary design
         
-        **Advanced Segment Method:**
-        - Segment-by-segment calculation (10-50 segments)
-        - Interactive TEMA drawings
-        - Visual tube sheet designer
-        - Subcool area analysis
-        - Professional results
+        **Professional Method:** ⭐ NEW!
+        - Shell-side or Tube-side refrigerant
+        - Row-based allocation (DX mode)
+        - Interactive TEMA diagrams
+        - Subcooling optimization
+        - TEMA BEM/BEU/AEM/AES support
         
-        **Use for:** Heat rejection, condensing units, cooling towers
+        **Use for:** Heat rejection, condensing units, DX systems
         """)
         
         col2a, col2b = st.columns(2)
@@ -172,19 +172,21 @@ if app_mode == "🏠 Home":
                 st.session_state.app_mode = "🔥 Condenser Designer (Standard)"
                 st.rerun()
         with col2b:
-            if st.button("Advanced Method", key="btn_cond_adv"):
-                st.session_state.app_mode = "🔬 Condenser Designer (Advanced Segment Model)"
+            if st.button("Professional Method ⭐", key="btn_cond_pro", type="primary"):
+                st.session_state.app_mode = "🔧 Condenser Designer (Professional)"
                 st.rerun()
     
     st.markdown("---")
     st.markdown("### 📋 Recent Updates")
     st.success("""
-    ✅ **Latest Version:**
-    - All critical calculation fixes applied
-    - Length-based zoning for physical accuracy
-    - Interactive visual design interfaces
-    - Comprehensive subcool analysis
-    - TEMA 10th Edition compliant
+    ✅ **Latest Version - February 2026:**
+    - ⭐ NEW: Professional Condenser Designer with two modes
+    - ⭐ Shell-side refrigerant (traditional BEM/AEM)
+    - ⭐ Tube-side refrigerant (DX) with row-based allocation
+    - ⭐ Interactive subcooling zone optimization
+    - ✅ Official TEMA diagrams integrated
+    - ✅ TEMA 10th Edition compliant
+    - ✅ All critical calculation fixes applied
     """)
 
 elif app_mode == "❄️ DX Evaporator Designer":
@@ -258,25 +260,22 @@ elif app_mode == "🔥 Condenser Designer (Standard)":
         st.exception(e)
         st.info("Make sure 'shell_tube_evap_condenser_CORRECTED.py' is in the same directory")
 
-elif app_mode == "🔬 Condenser Designer (Advanced Segment Model)":
-    # Import and run advanced segment-based condenser
-    st.markdown("## 🔬 Advanced Condenser Designer - Segment-by-Segment Model")
+elif app_mode == "🔧 Condenser Designer (Professional)":
+    # Import and run professional condenser designer
+    st.markdown("## 🔧 Professional Condenser Designer")
     
     try:
-        from modules.integrated_condenser_designer import IntegratedCondenserDesigner
+        from professional_condenser_designer import ProfessionalCondenserDesigner
         
-        # Run the integrated designer
-        designer = IntegratedCondenserDesigner()
+        # Run the professional designer
+        designer = ProfessionalCondenserDesigner()
         designer.run()
     
     except Exception as e:
-        st.error(f"Error loading advanced condenser designer: {str(e)}")
+        st.error(f"Error loading professional condenser designer: {str(e)}")
         st.exception(e)
         st.info("""
-        Make sure these files are in the 'modules' directory:
-        - integrated_condenser_designer.py
-        - segment_by_segment_model.py
-        - interactive_tube_sheet_designer.py
+        Make sure 'professional_condenser_designer.py' is in the same directory as app.py
         """)
 
 elif app_mode == "📚 Documentation":
@@ -353,21 +352,63 @@ elif app_mode == "📚 Documentation":
         
         **Standard Method:**
         - Fast calculation (seconds)
-        - Area distribution approach (corrected)
+        - Area distribution approach
+        - Shell-side refrigerant (traditional)
         - Good for preliminary design
         - All TEMA compliance checks
         
-        **Advanced Segment Method:**
-        - Detailed segment-by-segment (10-50 segments)
-        - Physically accurate length-based modeling
-        - Interactive visual design
-        - Subcool area analysis with recommendations
-        - Best for final design
+        **Professional Method:** ⭐ NEW!
+        - **Two Operating Modes:**
+          
+          **Mode A: Shell-Side Refrigerant (Traditional)**
+          - Refrigerant condenses on shell side
+          - Water/glycol in tubes
+          - TEMA types: BEM, AEM, AES
+          - Vertical cut baffles (drainage)
+          - Simple area-based calculation
+          
+          **Mode B: Tube-Side Refrigerant (DX)** ⭐
+          - Refrigerant in tubes (phase-changing)
+          - Water/glycol on shell side (cross-flow)
+          - TEMA types: BEM, BEU
+          - Horizontal cut baffles (zigzag flow)
+          - **ROW-BASED allocation** with user control
+          - Interactive subcooling optimization
         
-        #### Configuration Options
-        - Refrigerant in shell, water in tubes (common)
-        - Refrigerant in tubes, water on shell (optional)
-        - Zoned design with integral subcooler
+        #### DX Condenser Workflow (Mode B)
+        
+        **Step 1: Calculate Requirements**
+        - Enter design parameters
+        - Program calculates required rows per zone:
+          - Desuperheat zone
+          - Condensing zone
+          - Subcooling zone
+        
+        **Step 2: Allocate Rows**
+        - See recommended allocation
+        - Adjust rows for each zone
+        - Real-time validation
+        
+        **Step 3: Optimize Performance**
+        - View actual subcooling achieved
+        - Get warnings if zones undersized
+        - Follow optimization recommendations
+        - Iterate until satisfied
+        
+        #### Configuration Selection Guide
+        
+        **Choose Shell-Side Refrigerant When:**
+        - Large tonnage systems
+        - Flooded condenser design
+        - Standard HVAC/refrigeration
+        - Cost-effective solution needed
+        
+        **Choose Tube-Side Refrigerant (DX) When:**
+        - Direct expansion systems
+        - High-pressure refrigerants (R410A)
+        - Precise subcooling control needed
+        - Want to minimize refrigerant charge
+        - Need to handle thermal expansion
         
         #### Three-Region Calculation
         1. **Desuperheat:** Vapor → Saturated vapor
@@ -376,16 +417,17 @@ elif app_mode == "📚 Documentation":
         
         #### Common Issues & Solutions
         
-        **Subcooling Inadequate:**
-        - Add separate subcooler (recommended)
+        **Subcooling Inadequate (DX Mode):**
+        - Allocate more rows to subcooling zone
+        - Reduce water inlet temperature
         - Increase tube length
-        - Lower water inlet temperature
-        - Enable zoned design
+        - Add dedicated subcooler section
         
         **High Pressure Drop:**
         - Reduce number of passes
         - Increase tube size
         - Reduce baffle count
+        - Check tube-side velocity
         """)
     
     with tab4:
