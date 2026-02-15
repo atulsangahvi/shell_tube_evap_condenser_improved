@@ -18,6 +18,31 @@ import math
 from typing import Dict, List, Tuple, Optional
 from datetime import datetime
 
+# ============================================================================
+# IMPORT SUPPORTING MODULES
+# ============================================================================
+
+# Import from same directory (when in modules/)
+try:
+    from .interactive_tube_sheet_designer import (
+        TEMAArrangementDrawings,
+        InteractiveTubeSheet
+    )
+    from .segment_by_segment_model import (
+        SegmentBySegmentCondenser,
+        plot_segment_results
+    )
+except ImportError:
+    # Fallback for direct execution
+    from interactive_tube_sheet_designer import (
+        TEMAArrangementDrawings,
+        InteractiveTubeSheet
+    )
+    from segment_by_segment_model import (
+        SegmentBySegmentCondenser,
+        plot_segment_results
+    )
+
 
 class IntegratedCondenserDesigner:
     """
@@ -491,8 +516,6 @@ class IntegratedCondenserDesigner:
         
         # Initialize tube sheet if not exists
         if st.session_state.tube_sheet is None:
-            from interactive_tube_sheet_designer import InteractiveTubeSheet
-            
             inputs = st.session_state.inputs
             tube_pitch = 15.0  # mm (can be calculated from tube size)
             
@@ -715,8 +738,6 @@ class IntegratedCondenserDesigner:
             inputs['tema_type'] = st.session_state.tema_type
             
             # Initialize segment model
-            from segment_by_segment_model import SegmentBySegmentCondenser
-            
             segment_model = SegmentBySegmentCondenser(n_segments=inputs['n_segments'])
             
             status_text.text("Calculating segment properties...")
@@ -965,8 +986,6 @@ class IntegratedCondenserDesigner:
     
     def display_visualizations(self, results: Dict):
         """Display comprehensive visualizations"""
-        
-        from segment_by_segment_model import plot_segment_results
         
         fig = plot_segment_results(results)
         st.plotly_chart(fig, use_container_width=True)
