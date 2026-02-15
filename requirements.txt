@@ -1,20 +1,21 @@
 # TEMA Heat Exchanger Designer - Requirements
-# Python 3.9+
+# Compatible with Python 3.9 - 3.13
 
 # Core dependencies
-streamlit==1.29.0
-numpy==1.24.3
-pandas==2.0.3
-scipy==1.11.4
+streamlit>=1.30.0
+numpy>=1.26.0
+pandas>=2.1.0
+scipy>=1.11.0
 
 # Visualization
-plotly==5.18.0
+plotly>=5.18.0
 
 # Thermodynamic properties
-CoolProp==6.6.0
+CoolProp>=6.4.0
 
 # PDF generation
-reportlab==4.0.7
+reportlab>=4.0.0
 
-# Additional utilities
-python-dateutil==2.8.2
+# Additional utilities (auto-installed with above packages)
+# python-dateutil
+# typing-extensions
