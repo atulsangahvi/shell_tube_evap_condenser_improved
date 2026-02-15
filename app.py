@@ -196,34 +196,61 @@ elif app_mode == "❄️ DX Evaporator Designer":
     try:
         # Import the corrected evaporator/condenser code
         from shell_tube_evap_condenser_CORRECTED import (
-            HeatExchangerDesigner,
+            TEMACompliantDXHeatExchangerDesign,
             create_input_section,
             display_results
         )
         
-        # Initialize designer
-        if 'designer' not in st.session_state:
-            st.session_state.designer = HeatExchangerDesigner()
-        
-        designer = st.session_state.designer
-        
         # Create input section
-        inputs = create_input_section(designer, hx_type="evaporator")
+        inputs = create_input_section()
+        
+        # Filter for evaporator only
+        if inputs.get("hex_type") == "Condenser":
+            st.warning("⚠️ Please select 'DX Evaporator' in the sidebar")
         
         # Calculate button
-        if st.button("🔄 Calculate Evaporator Performance", type="primary"):
-            with st.spinner("Calculating..."):
-                results = designer.design_evaporator(inputs)
+        if st.sidebar.button("🚀 Calculate Design", type="primary", use_container_width=True):
+            with st.spinner("Calculating with TEMA 10th Edition standards..."):
+                designer = TEMACompliantDXHeatExchangerDesign()
+                
+                calc_inputs = inputs.copy()
+                calc_inputs["hex_type"] = "evaporator"
+                
+                results = designer.design_dx_evaporator(calc_inputs)
                 st.session_state.evap_results = results
+                st.session_state.evap_inputs = inputs
+        
+        # Reset button
+        if st.sidebar.button("🔄 Reset", use_container_width=True):
+            st.session_state.evap_results = None
+            st.session_state.evap_inputs = None
+            st.rerun()
         
         # Display results if available
-        if 'evap_results' in st.session_state:
-            display_results(st.session_state.evap_results, hx_type="evaporator")
+        if 'evap_results' in st.session_state and st.session_state.evap_results is not None:
+            display_results(st.session_state.evap_results, st.session_state.evap_inputs)
+        else:
+            st.info("""
+            ### 🔧 DX Evaporator Design Tool
+            
+            Enter parameters in the sidebar and click **Calculate Design**.
+            
+            **Configuration:** Refrigerant in tubes, Water/Glycol on shell
+            """)
     
+    except ImportError as e:
+        st.error(f"❌ Import Error: {str(e)}")
+        st.error("Make sure 'shell_tube_evap_condenser_CORRECTED.py' is in the same directory as app.py")
+        st.code("""
+Required file structure:
+your_directory/
+├── app.py
+├── shell_tube_evap_condenser_CORRECTED.py
+└── professional_condenser_designer.py
+        """)
     except Exception as e:
-        st.error(f"Error loading evaporator designer: {str(e)}")
+        st.error(f"Error: {str(e)}")
         st.exception(e)
-        st.info("Make sure 'shell_tube_evap_condenser_CORRECTED.py' is in the same directory")
 
 elif app_mode == "🔥 Condenser Designer (Standard)":
     # Import and run condenser from original corrected code
@@ -231,34 +258,61 @@ elif app_mode == "🔥 Condenser Designer (Standard)":
     
     try:
         from shell_tube_evap_condenser_CORRECTED import (
-            HeatExchangerDesigner,
+            TEMACompliantDXHeatExchangerDesign,
             create_input_section,
             display_results
         )
         
-        # Initialize designer
-        if 'designer' not in st.session_state:
-            st.session_state.designer = HeatExchangerDesigner()
-        
-        designer = st.session_state.designer
-        
         # Create input section
-        inputs = create_input_section(designer, hx_type="condenser")
+        inputs = create_input_section()
+        
+        # Filter for condenser only
+        if inputs.get("hex_type") == "DX Evaporator":
+            st.warning("⚠️ Please select 'Condenser' in the sidebar")
         
         # Calculate button
-        if st.button("🔄 Calculate Condenser Performance", type="primary"):
-            with st.spinner("Calculating..."):
-                results = designer.design_condenser(inputs)
+        if st.sidebar.button("🚀 Calculate Design", type="primary", use_container_width=True):
+            with st.spinner("Calculating with TEMA 10th Edition standards..."):
+                designer = TEMACompliantDXHeatExchangerDesign()
+                
+                calc_inputs = inputs.copy()
+                calc_inputs["hex_type"] = "condenser"
+                
+                results = designer.design_condenser(calc_inputs)
                 st.session_state.cond_results = results
+                st.session_state.cond_inputs = inputs
+        
+        # Reset button
+        if st.sidebar.button("🔄 Reset", use_container_width=True):
+            st.session_state.cond_results = None
+            st.session_state.cond_inputs = None
+            st.rerun()
         
         # Display results if available
-        if 'cond_results' in st.session_state:
-            display_results(st.session_state.cond_results, hx_type="condenser")
+        if 'cond_results' in st.session_state and st.session_state.cond_results is not None:
+            display_results(st.session_state.cond_results, st.session_state.cond_inputs)
+        else:
+            st.info("""
+            ### 🔧 Condenser Design Tool (Standard)
+            
+            Enter parameters in the sidebar and click **Calculate Design**.
+            
+            **Configuration:** Refrigerant on shell (default) or in tubes (optional)
+            """)
     
+    except ImportError as e:
+        st.error(f"❌ Import Error: {str(e)}")
+        st.error("Make sure 'shell_tube_evap_condenser_CORRECTED.py' is in the same directory as app.py")
+        st.code("""
+Required file structure:
+your_directory/
+├── app.py
+├── shell_tube_evap_condenser_CORRECTED.py
+└── professional_condenser_designer.py
+        """)
     except Exception as e:
-        st.error(f"Error loading condenser designer: {str(e)}")
+        st.error(f"Error: {str(e)}")
         st.exception(e)
-        st.info("Make sure 'shell_tube_evap_condenser_CORRECTED.py' is in the same directory")
 
 elif app_mode == "🔧 Condenser Designer (Professional)":
     # Import and run professional condenser designer
