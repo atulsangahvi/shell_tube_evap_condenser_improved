@@ -53,6 +53,21 @@ class ProfessionalCondenserDesigner:
         self.initialize_session_state()
         self.calc_engine = TEMACompliantDXHeatExchangerDesign()
     
+    def get_tube_od_mm(self, tube_size: str) -> float:
+        """Get tube OD in mm from TEMA standards"""
+        tube_od_map = {
+            "1/4\"": 6.35,
+            "3/8\"": 9.53,
+            "1/2\"": 12.7,
+            "5/8\"": 15.88,
+            "3/4\"": 19.05,
+            "1\"": 25.4,
+            "1.25\"": 31.75,
+            "1.5\"": 38.1,
+            "2\"": 50.8
+        }
+        return tube_od_map.get(tube_size, 15.88)  # Default to 5/8"
+    
     def initialize_session_state(self):
         """Initialize session state variables"""
         if 'condenser_mode' not in st.session_state:
@@ -407,8 +422,9 @@ class ProfessionalCondenserDesigner:
             st.markdown("#### Geometry")
             tube_size = st.selectbox(
                 "Tube Size",
-                ["1/2\"", "5/8\"", "3/4\"", "1\""],
-                index=1
+                ["1/4\"", "3/8\"", "1/2\"", "5/8\"", "3/4\"", "1\"", "1.25\"", "1.5\"", "2\""],
+                index=3,  # Default to 5/8"
+                help="TEMA standard tube sizes"
             )
             
             bwg = st.selectbox(
@@ -480,14 +496,20 @@ class ProfessionalCondenserDesigner:
         st.markdown("### Calculate Zone Requirements")
         st.markdown("Enter design parameters to calculate how many tube rows are needed for each zone")
         
-        # Input form
-        inputs = self.create_inputs_dx()
+        try:
+            # Input form
+            inputs = self.create_inputs_dx()
+            
+            if st.button("📊 Calculate Required Rows", type="primary", key="calc_req"):
+                with st.spinner("Calculating zone requirements..."):
+                    requirements = self.calculate_zone_requirements_dx(inputs)
+                    st.session_state.zone_requirements = requirements
+                    st.session_state.dx_inputs = inputs
         
-        if st.button("📊 Calculate Required Rows", type="primary", key="calc_req"):
-            with st.spinner("Calculating zone requirements..."):
-                requirements = self.calculate_zone_requirements_dx(inputs)
-                st.session_state.zone_requirements = requirements
-                st.session_state.dx_inputs = inputs
+        except Exception as e:
+            st.error(f"❌ Error in input processing: {str(e)}")
+            st.exception(e)
+            return
         
         # Display requirements if calculated
         if 'zone_requirements' in st.session_state:
@@ -828,9 +850,10 @@ class ProfessionalCondenserDesigner:
             st.markdown("#### Tube Geometry")
             tube_size = st.selectbox(
                 "Tube Size",
-                ["1/2\"", "5/8\"", "3/4\""],
-                index=1,
-                key="dx_size"
+                ["1/4\"", "3/8\"", "1/2\"", "5/8\"", "3/4\"", "1\"", "1.25\"", "1.5\"", "2\""],
+                index=3,  # Default to 5/8"
+                key="dx_size",
+                help="TEMA standard tube sizes"
             )
             
             bwg = st.selectbox(
@@ -877,83 +900,91 @@ class ProfessionalCondenserDesigner:
     def calculate_zone_requirements_dx(self, inputs: Dict) -> Dict:
         """Calculate required rows for each zone based on heat duties"""
         
-        # Get refrigerant properties
-        refrigerant = inputs['refrigerant']
-        T_cond = inputs['T_cond']
-        T_superheat = inputs['T_superheat']
-        subcool_target = inputs['subcool_target']
-        m_dot_ref = inputs['m_dot_ref']
-        
-        # Get properties at saturation
-        T_K = T_cond + 273.15
-        P_sat = CP.PropsSI('P', 'T', T_K, 'Q', 1, refrigerant)
-        
-        # Vapor properties (superheated)
-        T_in = T_cond + T_superheat
-        T_in_K = T_in + 273.15
-        cp_v = CP.PropsSI('C', 'T', T_in_K, 'P', P_sat, refrigerant)
-        
-        # Liquid properties
-        cp_l = CP.PropsSI('C', 'T', T_K, 'Q', 0, refrigerant)
-        
-        # Latent heat
-        h_l = CP.PropsSI('H', 'T', T_K, 'Q', 0, refrigerant)
-        h_v = CP.PropsSI('H', 'T', T_K, 'Q', 1, refrigerant)
-        h_fg = h_v - h_l
-        
-        # Heat duties (W)
-        Q_desuperheat = m_dot_ref * cp_v * T_superheat
-        Q_condensing = m_dot_ref * h_fg
-        Q_subcooling = m_dot_ref * cp_l * subcool_target
-        Q_total = Q_desuperheat + Q_condensing + Q_subcooling
-        
-        # Estimate rows needed (simplified - assumes constant U and LMTD)
-        # This is a first approximation
-        tube_length = inputs['tube_length']
-        tubes_per_row = inputs['tubes_per_row']
-        
-        # Get tube OD
-        tube_size = inputs['tube_size']
-        tube_od_mm = float(tube_size.replace('"', '')) * 25.4
-        tube_od_m = tube_od_mm / 1000
-        
-        # Area per row
-        A_row = math.pi * tube_od_m * tube_length * tubes_per_row
-        
-        # Assume typical U values (W/m²K) for each zone
-        U_desuperheat = 800  # Single phase vapor
-        U_condensing = 1500  # Two-phase condensation
-        U_subcooling = 1200  # Single phase liquid
-        
-        # Assume typical LMTD (K) - simplified
-        LMTD_desuperheat = 8
-        LMTD_condensing = 10
-        LMTD_subcooling = 6
-        
-        # Required area per zone
-        A_desuperheat = Q_desuperheat / (U_desuperheat * LMTD_desuperheat)
-        A_condensing = Q_condensing / (U_condensing * LMTD_condensing)
-        A_subcooling = Q_subcooling / (U_subcooling * LMTD_subcooling)
-        
-        # Required rows
-        rows_desuperheat = max(1, A_desuperheat / A_row)
-        rows_condensing = max(1, A_condensing / A_row)
-        rows_subcooling = max(1, A_subcooling / A_row)
-        
-        requirements = {
-            'Q_desuperheat': Q_desuperheat,
-            'Q_condensing': Q_condensing,
-            'Q_subcooling': Q_subcooling,
-            'Q_total': Q_total,
-            'desuperheat_rows': math.ceil(rows_desuperheat),
-            'condensing_rows': math.ceil(rows_condensing),
-            'subcooling_rows': math.ceil(rows_subcooling),
-            'subcool_target': subcool_target,
-            'T_water_in': inputs['T_water_in'],
-            'A_row': A_row
-        }
-        
-        return requirements
+        try:
+            # Get refrigerant properties
+            refrigerant = inputs['refrigerant']
+            T_cond = inputs['T_cond']
+            T_superheat = inputs['T_superheat']
+            subcool_target = inputs['subcool_target']
+            m_dot_ref = inputs['m_dot_ref']
+            
+            # Get properties at saturation
+            T_K = T_cond + 273.15
+            P_sat = CP.PropsSI('P', 'T', T_K, 'Q', 1, refrigerant)
+            
+            # Vapor properties (superheated)
+            T_in = T_cond + T_superheat
+            T_in_K = T_in + 273.15
+            cp_v = CP.PropsSI('C', 'T', T_in_K, 'P', P_sat, refrigerant)
+            
+            # Liquid properties
+            cp_l = CP.PropsSI('C', 'T', T_K, 'Q', 0, refrigerant)
+            
+            # Latent heat
+            h_l = CP.PropsSI('H', 'T', T_K, 'Q', 0, refrigerant)
+            h_v = CP.PropsSI('H', 'T', T_K, 'Q', 1, refrigerant)
+            h_fg = h_v - h_l
+            
+            # Heat duties (W)
+            Q_desuperheat = m_dot_ref * cp_v * T_superheat
+            Q_condensing = m_dot_ref * h_fg
+            Q_subcooling = m_dot_ref * cp_l * subcool_target
+            Q_total = Q_desuperheat + Q_condensing + Q_subcooling
+            
+            # Estimate rows needed (simplified - assumes constant U and LMTD)
+            tube_length = inputs['tube_length']
+            tubes_per_row = inputs['tubes_per_row']
+            
+            # Get tube OD using helper method
+            tube_size = inputs['tube_size']
+            tube_od_mm = self.get_tube_od_mm(tube_size)
+            tube_od_m = tube_od_mm / 1000
+            
+            # Area per row
+            A_row = math.pi * tube_od_m * tube_length * tubes_per_row
+            
+            # Assume typical U values (W/m²K) for each zone
+            U_desuperheat = 800  # Single phase vapor
+            U_condensing = 1500  # Two-phase condensation
+            U_subcooling = 1200  # Single phase liquid
+            
+            # Assume typical LMTD (K) - simplified
+            LMTD_desuperheat = 8
+            LMTD_condensing = 10
+            LMTD_subcooling = 6
+            
+            # Required area per zone
+            A_desuperheat = Q_desuperheat / (U_desuperheat * LMTD_desuperheat)
+            A_condensing = Q_condensing / (U_condensing * LMTD_condensing)
+            A_subcooling = Q_subcooling / (U_subcooling * LMTD_subcooling)
+            
+            # Required rows
+            rows_desuperheat = max(1, A_desuperheat / A_row)
+            rows_condensing = max(1, A_condensing / A_row)
+            rows_subcooling = max(1, A_subcooling / A_row)
+            
+            requirements = {
+                'Q_desuperheat': Q_desuperheat,
+                'Q_condensing': Q_condensing,
+                'Q_subcooling': Q_subcooling,
+                'Q_total': Q_total,
+                'desuperheat_rows': math.ceil(rows_desuperheat),
+                'condensing_rows': math.ceil(rows_condensing),
+                'subcooling_rows': math.ceil(rows_subcooling),
+                'subcool_target': subcool_target,
+                'T_water_in': inputs['T_water_in'],
+                'A_row': A_row
+            }
+            
+            return requirements
+            
+        except KeyError as e:
+            st.error(f"❌ Missing input parameter: {str(e)}")
+            raise
+        except Exception as e:
+            st.error(f"❌ Error calculating zone requirements: {str(e)}")
+            st.error("Please check your input values")
+            raise
     
     def calculate_dx_with_allocation(self, inputs: Dict, allocation: Dict) -> Dict:
         """Calculate actual performance with user's row allocation"""
