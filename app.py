@@ -315,22 +315,35 @@ your_directory/
         st.exception(e)
 
 elif app_mode == "🔧 Condenser Designer (Professional)":
-    # Import and run professional condenser designer
-    st.markdown("## 🔧 Professional Condenser Designer")
+    # Import and run FULLY INTEGRATED professional condenser designer
+    st.markdown("## 🔧 Professional DX Condenser Designer")
     
     try:
-        from professional_condenser_designer import ProfessionalCondenserDesigner
+        from professional_condenser_integrated import IntegratedProfessionalDXCondenser
         
-        # Run the professional designer
-        designer = ProfessionalCondenserDesigner()
+        # Run the fully integrated designer
+        # Features: Row allocation + Complete TEMA calculations + PDF reports
+        designer = IntegratedProfessionalDXCondenser()
         designer.run()
     
+    except ImportError as e:
+        st.error(f"❌ Import Error: {str(e)}")
+        st.error("Make sure 'professional_condenser_integrated.py' is available")
+        st.info("""
+        **Required files:**
+        - professional_condenser_integrated.py (NEW integrated version)
+        - shell_tube_evap_condenser_CORRECTED.py (calculation engine)
+        
+        **What you get:**
+        - ✅ Row-based zone allocation
+        - ✅ Full TEMA 10th Edition calculations
+        - ✅ PDF report generation
+        - ✅ Complete vibration analysis
+        - ✅ All compliance checks
+        """)
     except Exception as e:
         st.error(f"Error loading professional condenser designer: {str(e)}")
         st.exception(e)
-        st.info("""
-        Make sure 'professional_condenser_designer.py' is in the same directory as app.py
-        """)
 
 elif app_mode == "📚 Documentation":
     # Documentation page
