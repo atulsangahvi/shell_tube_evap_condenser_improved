@@ -517,6 +517,16 @@ class ProfessionalCondenserDesigner:
             
             st.success("✅ Zone Requirements Calculated")
             
+            # Show bundle geometry info
+            st.info(f"""
+            **Circular Bundle Geometry:**
+            - Total tubes: {req['n_tubes_total']}
+            - Estimated rows: ~{req['n_rows_estimate']} (circular arrangement)
+            - Average tubes/row: ~{req['tubes_per_row_avg']:.1f}
+            - Inlet temperature: {req['T_ref_in']:.1f}°C
+            - Superheat: {req['T_superheat']:.1f}K
+            """)
+            
             col1, col2, col3, col4 = st.columns(4)
             
             with col1:
@@ -553,6 +563,15 @@ class ProfessionalCondenserDesigner:
             
             # Visualization
             self.visualize_zone_requirements(req)
+            
+            # Important note about circular bundles
+            st.warning("""
+            **⚠️ Important Note:**
+            - This is a simplified estimate assuming uniform row distribution
+            - Actual circular bundles have varying tube counts per row
+            - Inner rows have fewer tubes, outer rows have more tubes
+            - For precise design, detailed bundle geometry calculation is needed
+            """)
             
             # Move to next step
             st.info("✅ Requirements calculated. Proceed to **Step 2: Allocate Rows** to design the tube bundle.")
@@ -778,122 +797,272 @@ class ProfessionalCondenserDesigner:
                 st.info("Return to Step 1 to adjust water temperature")
     
     def create_inputs_dx(self) -> Dict:
-        """Create input form for DX condenser"""
+        """Create input form for DX condenser - MATCHES STANDARD CONDENSER INPUTS"""
+        
+        st.markdown("### Design Parameters")
+        st.markdown("*All inputs match Standard Condenser for consistency*")
+        
+        inputs = {}
+        
+        # ====================================================================
+        # REFRIGERANT PARAMETERS (Match Standard Condenser)
+        # ====================================================================
+        st.markdown("#### 🔧 Refrigerant Parameters")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            inputs["refrigerant"] = st.selectbox(
+                "Refrigerant Type",
+                ["R134a", "R410A", "R407C", "R404A", "R22", "R32", "R1234yf", "R717", "R744"],
+                help="Properties calculated via CoolProp database"
+            )
+            
+            inputs["m_dot_ref"] = st.number_input(
+                "Refrigerant Mass Flow (kg/s)",
+                min_value=0.01,
+                max_value=10.0,
+                value=0.221,
+                step=0.001,
+                format="%.3f",
+                help="From compressor specification sheet",
+                key="dx_m_ref"
+            )
+        
+        with col2:
+            # CORRECTED: Use actual inlet temperature, not superheat delta
+            inputs["T_ref_in_superheated"] = st.number_input(
+                "Superheated Refrigerant Inlet (°C)",
+                min_value=30.0,
+                max_value=150.0,
+                value=80.0,
+                step=1.0,
+                format="%.1f",
+                help="Temperature from compressor discharge",
+                key="dx_t_in"
+            )
+            
+            inputs["T_ref"] = st.number_input(
+                "Condensing Temperature (°C)",
+                min_value=20.0,
+                max_value=80.0,
+                value=45.0,
+                step=1.0,
+                format="%.1f",
+                key="dx_t_cond"
+            )
+            
+            inputs["delta_T_sh_sc"] = st.number_input(
+                "Required Subcooling at Exit (K)",
+                min_value=0.0,
+                max_value=20.0,
+                value=5.0,
+                step=0.5,
+                format="%.1f",
+                key="dx_subcool"
+            )
+        
+        st.markdown("---")
+        
+        # ====================================================================
+        # WATER/GLYCOL PARAMETERS (Match Standard Condenser)
+        # ====================================================================
+        st.markdown("#### 💧 Water/Glycol Side")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            glycol_options = ["Water Only", "Water + Ethylene Glycol", "Water + Propylene Glycol (Food Grade)"]
+            glycol_choice = st.radio("Fluid Type", glycol_options, key="dx_glycol_type")
+            
+            if "Ethylene" in glycol_choice:
+                inputs["glycol_type"] = "ethylene"
+            elif "Propylene" in glycol_choice:
+                inputs["glycol_type"] = "propylene"
+            else:
+                inputs["glycol_type"] = "water"
+            
+            if "Glycol" in glycol_choice:
+                inputs["glycol_percentage"] = st.number_input(
+                    "Glycol Percentage",
+                    min_value=0,
+                    max_value=60,
+                    value=30,
+                    step=5,
+                    format="%d",
+                    help="Higher percentage = lower freeze point",
+                    key="dx_glycol_pct"
+                )
+            else:
+                inputs["glycol_percentage"] = 0
+        
+        with col2:
+            inputs["T_sec_in"] = st.number_input(
+                "Water Inlet Temperature (°C)",
+                min_value=-20.0 if "Glycol" in glycol_choice else 0.0,
+                max_value=80.0,
+                value=30.0,
+                step=1.0,
+                format="%.1f",
+                key="dx_t_water"
+            )
+            
+            # CORRECTED: Use L/hr instead of kg/s to match Standard Condenser
+            inputs["m_dot_sec"] = st.number_input(
+                "Water Flow Rate (L/hr)",
+                min_value=100.0,
+                max_value=100000.0,
+                value=25000.0,
+                step=100.0,
+                format="%.0f",
+                help="Liters per hour",
+                key="dx_water_flow"
+            )
+        
+        st.markdown("---")
+        
+        # ====================================================================
+        # TEMA GEOMETRY PARAMETERS (Match Standard Condenser)
+        # ====================================================================
+        st.markdown("#### 📐 TEMA Geometry Parameters")
         
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            st.markdown("#### Refrigerant Data")
-            refrigerant = st.selectbox(
-                "Refrigerant",
-                ["R134a", "R410A", "R407C", "R404A"],
-                key="dx_ref"
-            )
-            
-            T_cond = st.number_input(
-                "Condensing Temp (°C)",
-                value=40.0,
-                min_value=20.0,
-                max_value=60.0,
-                step=1.0,
-                key="dx_tcond"
-            )
-            
-            T_superheat = st.number_input(
-                "Superheat (K)",
-                value=10.0,
-                min_value=0.0,
-                max_value=30.0,
-                step=1.0,
-                key="dx_superheat"
-            )
-            
-            subcool_target = st.number_input(
-                "Target Subcool (K)",
-                value=5.0,
-                min_value=0.0,
-                max_value=15.0,
-                step=1.0,
-                key="dx_subcool"
-            )
-            
-            m_dot_ref = st.number_input(
-                "Refrigerant Flow (kg/s)",
-                value=1.0,
-                min_value=0.1,
-                max_value=10.0,
-                step=0.1,
-                key="dx_mdot"
-            )
-        
-        with col2:
-            st.markdown("#### Water Data")
-            T_water_in = st.number_input(
-                "Water Inlet (°C)",
-                value=25.0,
-                min_value=5.0,
-                max_value=40.0,
-                step=1.0,
-                key="dx_tw"
-            )
-            
-            m_dot_water = st.number_input(
-                "Water Flow (kg/s)",
-                value=5.0,
-                min_value=0.5,
-                max_value=50.0,
-                step=0.5,
-                key="dx_mw"
-            )
-        
-        with col3:
-            st.markdown("#### Tube Geometry")
-            tube_size = st.selectbox(
+            # Tube selection
+            inputs["tube_size"] = st.selectbox(
                 "Tube Size",
                 ["1/4\"", "3/8\"", "1/2\"", "5/8\"", "3/4\"", "1\"", "1.25\"", "1.5\"", "2\""],
-                index=3,  # Default to 5/8"
-                key="dx_size",
-                help="TEMA standard tube sizes"
+                index=3,
+                help="TEMA Table D-7 standard sizes",
+                key="dx_tube_size"
             )
             
-            bwg = st.selectbox(
-                "BWG",
-                ["16", "18", "20"],
-                index=1,
+            # Get available BWG for selected tube size (simplified - use common options)
+            inputs["bwg"] = st.selectbox(
+                "BWG Gauge",
+                ["14", "16", "18", "20"],
+                index=2,
+                help="Tube wall thickness",
                 key="dx_bwg"
             )
             
-            tube_length = st.number_input(
-                "Length (m)",
-                value=3.0,
-                min_value=1.0,
-                max_value=6.0,
-                step=0.5,
-                key="dx_length"
-            )
-            
-            tubes_per_row = st.number_input(
-                "Tubes per Row",
-                value=10,
-                min_value=5,
-                max_value=30,
-                step=1,
-                key="dx_tpr"
+            inputs["tube_material"] = st.selectbox(
+                "Tube Material",
+                ["Copper", "Cu-Ni 90/10", "Steel", "Aluminum Brass", "Stainless Steel 304", "Stainless Steel 316", "Titanium"],
+                help="Copper: Best heat transfer\nCu-Ni: Corrosion resistant\nStainless: Chemical service",
+                key="dx_material"
             )
         
-        inputs = {
-            'refrigerant': refrigerant,
-            'T_cond': T_cond,
-            'T_superheat': T_superheat,
-            'subcool_target': subcool_target,
-            'm_dot_ref': m_dot_ref,
-            'T_water_in': T_water_in,
-            'm_dot_water': m_dot_water,
-            'tube_size': tube_size,
-            'bwg': bwg,
-            'tube_length': tube_length,
-            'tubes_per_row': tubes_per_row
-        }
+        with col2:
+            # Get tube OD for pitch calculation
+            tube_od_mm = self.get_tube_od_mm(inputs["tube_size"])
+            min_pitch_mm = tube_od_mm * 1.25
+            
+            inputs["tube_pitch"] = st.number_input(
+                "Tube Pitch (mm)",
+                min_value=min_pitch_mm,
+                max_value=100.0,
+                value=min_pitch_mm,
+                step=0.5,
+                format="%.1f",
+                help=f"TEMA minimum: {min_pitch_mm:.1f}mm (1.25 × OD)",
+                key="dx_pitch"
+            )
+            
+            # Show pitch ratio validation
+            pitch_ratio = inputs["tube_pitch"] / tube_od_mm
+            if pitch_ratio < 1.25:
+                st.error(f"⚠️ TEMA R-2.5 violation: Pitch ratio < 1.25")
+            elif pitch_ratio < 1.33:
+                st.warning(f"⚠️ Pitch ratio {pitch_ratio:.2f} - TEMA minimum is 1.25")
+            else:
+                st.success(f"✓ TEMA compliant: Pitch ratio = {pitch_ratio:.2f}")
+            
+            inputs["n_passes"] = st.selectbox(
+                "Tube Passes",
+                [1, 2, 4, 6],
+                index=1,
+                help="More passes = higher velocity but more pressure drop",
+                key="dx_passes"
+            )
+            
+            inputs["tube_layout"] = st.radio(
+                "Tube Layout",
+                ["Triangular", "Square", "Rotated Square"],
+                help="Triangular: Higher heat transfer\nSquare: Easier cleaning",
+                key="dx_layout"
+            )
+        
+        with col3:
+            inputs["n_baffles"] = st.number_input(
+                "Number of Baffles",
+                min_value=1,
+                max_value=20,
+                value=5,
+                step=1,
+                format="%d",
+                help="More baffles = better HTC but higher ΔP",
+                key="dx_baffles"
+            )
+            
+            inputs["baffle_cut"] = st.number_input(
+                "Baffle Cut (%)",
+                min_value=15,
+                max_value=45,
+                value=25,
+                step=5,
+                format="%d",
+                help="Typical: 20-25% for liquids, 35-45% for gases",
+                key="dx_baffle_cut"
+            )
+            
+            # CORRECTED: Use total number of tubes, not tubes per row
+            inputs["n_tubes"] = st.number_input(
+                "Number of Tubes",
+                min_value=1,
+                max_value=1000,
+                value=100,
+                step=5,
+                format="%d",
+                help="Total tubes in circular bundle",
+                key="dx_n_tubes"
+            )
+            
+            inputs["tube_length"] = st.number_input(
+                "Tube Length (m)",
+                min_value=0.5,
+                max_value=10.0,
+                value=3.0,
+                step=0.1,
+                format="%.1f",
+                key="dx_length"
+            )
+        
+        st.markdown("---")
+        
+        # Optional settings
+        with st.expander("⚙️ Additional Settings"):
+            inputs["mechanical_cleaning"] = st.checkbox(
+                "Shell Side Mechanical Cleaning Required",
+                value=False,
+                help="Affects tube pitch and cleaning lane requirements per TEMA R-2.5",
+                key="dx_cleaning"
+            )
+            
+            inputs["vibration_analysis"] = st.checkbox(
+                "Perform TEMA Section 6 Vibration Analysis",
+                value=True,
+                help="Critical for preventing flow-induced tube vibration",
+                key="dx_vibration"
+            )
+            
+            inputs["has_impingement_plate"] = st.checkbox(
+                "Include Impingement Plate",
+                value=True,
+                help="Required for two-phase flow per TEMA RCB-4.6.1",
+                key="dx_impingement"
+            )
         
         return inputs
     
@@ -903,9 +1072,13 @@ class ProfessionalCondenserDesigner:
         try:
             # Get refrigerant properties
             refrigerant = inputs['refrigerant']
-            T_cond = inputs['T_cond']
-            T_superheat = inputs['T_superheat']
-            subcool_target = inputs['subcool_target']
+            T_cond = inputs['T_ref']
+            T_ref_in = inputs['T_ref_in_superheated']
+            
+            # CORRECTED: Calculate superheat from inlet and condensing temperatures
+            T_superheat = T_ref_in - T_cond
+            
+            subcool_target = inputs['delta_T_sh_sc']
             m_dot_ref = inputs['m_dot_ref']
             
             # Get properties at saturation
@@ -913,8 +1086,7 @@ class ProfessionalCondenserDesigner:
             P_sat = CP.PropsSI('P', 'T', T_K, 'Q', 1, refrigerant)
             
             # Vapor properties (superheated)
-            T_in = T_cond + T_superheat
-            T_in_K = T_in + 273.15
+            T_in_K = T_ref_in + 273.15
             cp_v = CP.PropsSI('C', 'T', T_in_K, 'P', P_sat, refrigerant)
             
             # Liquid properties
@@ -931,17 +1103,34 @@ class ProfessionalCondenserDesigner:
             Q_subcooling = m_dot_ref * cp_l * subcool_target
             Q_total = Q_desuperheat + Q_condensing + Q_subcooling
             
-            # Estimate rows needed (simplified - assumes constant U and LMTD)
+            # Geometry
             tube_length = inputs['tube_length']
-            tubes_per_row = inputs['tubes_per_row']
+            n_tubes_total = inputs['n_tubes']
             
-            # Get tube OD using helper method
+            # Get tube OD
             tube_size = inputs['tube_size']
             tube_od_mm = self.get_tube_od_mm(tube_size)
             tube_od_m = tube_od_mm / 1000
             
-            # Area per row
-            A_row = math.pi * tube_od_m * tube_length * tubes_per_row
+            # Calculate circular bundle geometry
+            tube_pitch_mm = inputs['tube_pitch']
+            tube_pitch_m = tube_pitch_mm / 1000
+            tube_layout = inputs['tube_layout']
+            
+            # Estimate number of rows in circular bundle
+            # This is approximate - actual row calculation is complex
+            # For triangular: rows ≈ sqrt(n_tubes / 1.155)
+            # For square: rows ≈ sqrt(n_tubes)
+            if tube_layout == "Triangular":
+                n_rows_estimate = math.ceil(math.sqrt(n_tubes_total / 1.155))
+            else:  # Square or Rotated Square
+                n_rows_estimate = math.ceil(math.sqrt(n_tubes_total))
+            
+            # Average tubes per row (for calculation purposes)
+            tubes_per_row_avg = n_tubes_total / n_rows_estimate
+            
+            # Area per row (approximate)
+            A_row = math.pi * tube_od_m * tube_length * tubes_per_row_avg
             
             # Assume typical U values (W/m²K) for each zone
             U_desuperheat = 800  # Single phase vapor
@@ -972,14 +1161,20 @@ class ProfessionalCondenserDesigner:
                 'condensing_rows': math.ceil(rows_condensing),
                 'subcooling_rows': math.ceil(rows_subcooling),
                 'subcool_target': subcool_target,
-                'T_water_in': inputs['T_water_in'],
-                'A_row': A_row
+                'T_water_in': inputs['T_sec_in'],
+                'A_row': A_row,
+                'n_tubes_total': n_tubes_total,
+                'n_rows_estimate': n_rows_estimate,
+                'tubes_per_row_avg': tubes_per_row_avg,
+                'T_superheat': T_superheat,  # Store for display
+                'T_ref_in': T_ref_in
             }
             
             return requirements
             
         except KeyError as e:
             st.error(f"❌ Missing input parameter: {str(e)}")
+            st.error("Please make sure all required fields are filled")
             raise
         except Exception as e:
             st.error(f"❌ Error calculating zone requirements: {str(e)}")
@@ -1021,9 +1216,12 @@ class ProfessionalCondenserDesigner:
         Q_total = sum(z['Q'] for z in zones.values())
         
         # Water outlet temperature
-        m_water = inputs['m_dot_water']
+        # CORRECTED: Convert L/hr to kg/s
+        m_water_Lhr = inputs['m_dot_sec']
+        m_water_kgs = m_water_Lhr / 3600  # Convert L/hr to kg/s (assuming density ≈ 1 kg/L)
+        
         cp_water = 4186  # J/kg·K
-        T_water_out = inputs['T_water_in'] + Q_total / (m_water * cp_water)
+        T_water_out = inputs['T_sec_in'] + Q_total / (m_water_kgs * cp_water)
         
         # Warnings and recommendations
         warnings = []
