@@ -85,7 +85,7 @@ st.markdown("""
 
 # Header
 st.markdown('<h1 class="main-header">🌡️ TEMA Heat Exchanger Designer</h1>', unsafe_allow_html=True)
-st.markdown("**Professional tool for DX evaporators and condensers - TEMA 10th Edition**")
+st.markdown("**Design tool for DX evaporators and condensers - TEMA 10th Edition**")
 
 # ============================================================================
 # SIDEBAR: APPLICATION SELECTION
@@ -98,8 +98,7 @@ app_mode = st.sidebar.selectbox(
     [
         "🏠 Home",
         "❄️ DX Evaporator Designer",
-        "🔥 Condenser Designer (Standard)",
-        "🔧 Condenser Designer (Professional)",
+        "🔥 Condenser Designer",
         "📚 Documentation"
     ]
 )
@@ -109,7 +108,7 @@ st.sidebar.markdown("### About")
 st.sidebar.info(
     "This tool provides comprehensive design capabilities for:\n\n"
     "- **DX Evaporators** (refrigerant in tubes)\n"
-    "- **Condensers** (standard or advanced methods)\n\n"
+    "- **Condensers** (standard method with optional zoned subcooler model)\n\n"
     "All calculations comply with **TEMA 10th Edition** standards."
 )
 
@@ -156,7 +155,7 @@ if app_mode == "🏠 Home":
         - Shell-side refrigerant
         - Good for preliminary design
         
-        **Professional Method:** ⭐ NEW!
+        **Advanced Zoned Model:** ⭐
         - Shell-side or Tube-side refrigerant
         - Row-based allocation (DX mode)
         - Interactive TEMA diagrams
@@ -169,18 +168,18 @@ if app_mode == "🏠 Home":
         col2a, col2b = st.columns(2)
         with col2a:
             if st.button("Standard Method", key="btn_cond_std"):
-                st.session_state.app_mode = "🔥 Condenser Designer (Standard)"
+                st.session_state.app_mode = "🔥 Condenser Designer"
                 st.rerun()
         with col2b:
-            if st.button("Professional Method ⭐", key="btn_cond_pro", type="primary"):
-                st.session_state.app_mode = "🔧 Condenser Designer (Professional)"
+            if st.button("Advanced Zoned Model ⭐", key="btn_cond_pro", type="primary"):
+                st.session_state.app_mode = "🔥 Condenser Designer"
                 st.rerun()
     
     st.markdown("---")
     st.markdown("### 📋 Recent Updates")
     st.success("""
     ✅ **Latest Version - February 2026:**
-    - ⭐ NEW: Professional Condenser Designer with two modes
+    - Condenser Designer includes an Advanced zoned (integral subcooler) option
     - ⭐ Shell-side refrigerant (traditional BEM/AEM)
     - ⭐ Tube-side refrigerant (DX) with row-based allocation
     - ⭐ Interactive subcooling zone optimization
@@ -252,7 +251,7 @@ your_directory/
         st.error(f"Error: {str(e)}")
         st.exception(e)
 
-elif app_mode == "🔥 Condenser Designer (Standard)":
+elif app_mode == "🔥 Condenser Designer":
     # Import and run condenser from original corrected code
     st.markdown("## 🔥 Condenser Designer (Standard Method)")
     
@@ -312,37 +311,6 @@ your_directory/
         """)
     except Exception as e:
         st.error(f"Error: {str(e)}")
-        st.exception(e)
-
-elif app_mode == "🔧 Condenser Designer (Professional)":
-    # Import and run FULLY INTEGRATED professional condenser designer
-    st.markdown("## 🔧 Professional DX Condenser Designer")
-    
-    try:
-        from professional_condenser_integrated import IntegratedProfessionalDXCondenser
-        
-        # Run the fully integrated designer
-        # Features: Row allocation + Complete TEMA calculations + PDF reports
-        designer = IntegratedProfessionalDXCondenser()
-        designer.run()
-    
-    except ImportError as e:
-        st.error(f"❌ Import Error: {str(e)}")
-        st.error("Make sure 'professional_condenser_integrated.py' is available")
-        st.info("""
-        **Required files:**
-        - professional_condenser_integrated.py (NEW integrated version)
-        - shell_tube_evap_condenser_CORRECTED.py (calculation engine)
-        
-        **What you get:**
-        - ✅ Row-based zone allocation
-        - ✅ Full TEMA 10th Edition calculations
-        - ✅ PDF report generation
-        - ✅ Complete vibration analysis
-        - ✅ All compliance checks
-        """)
-    except Exception as e:
-        st.error(f"Error loading professional condenser designer: {str(e)}")
         st.exception(e)
 
 elif app_mode == "📚 Documentation":
@@ -424,7 +392,7 @@ elif app_mode == "📚 Documentation":
         - Good for preliminary design
         - All TEMA compliance checks
         
-        **Professional Method:** ⭐ NEW!
+        **Advanced Zoned Model:** ⭐
         - **Two Operating Modes:**
           
           **Mode A: Shell-Side Refrigerant (Traditional)**
