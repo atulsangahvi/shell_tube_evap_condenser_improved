@@ -2212,7 +2212,58 @@ class TEMACompliantDXHeatExchangerDesign:
             A_condense = A_condense * A_total / A_sum
             A_subcool = A_subcool * A_total / A_sum
 
-        # Secondary fluid heat capacity rate
+        
+        # ============================================================
+        # OPTIONAL: Zoned condenser allocation (integral subcooler)
+        # When enabled, reserve a dedicated fraction/rows of area for subcooling.
+        # This improves realism for the common case: "Total kW OK but subcooling short".
+        # Correlations (Shah, etc.) are NOT changed; only the available A per zone is reallocated.
+        # ============================================================
+        if refrigerant_side == "shell" and inputs.get("zoned_condenser_enabled", False):
+            method = inputs.get("zoned_condenser_method", "area_fraction")
+            f_sc = None
+
+            if method == "area_fraction":
+                try:
+                    f_sc = float(inputs.get("subcool_area_fraction", 0.20))
+                except Exception:
+                    f_sc = 0.20
+            elif method == "row_based":
+                try:
+                    tubes_per_row = max(int(inputs.get("estimated_tubes_per_row", 25)), 1)
+                    total_rows = int(math.ceil(n_tubes / tubes_per_row))
+                    sc_rows = max(int(inputs.get("subcool_rows", 1)), 1)
+                    f_sc = min(sc_rows / max(total_rows, 1), 0.60)
+                except Exception:
+                    f_sc = 0.20
+
+            # Clamp to safe range
+            f_sc = min(max(f_sc if f_sc is not None else 0.20, 0.05), 0.60)
+
+            # Reserve area for subcooling and redistribute remaining between desuperheat + condense
+            A_subcool = A_total * f_sc
+            A_remaining = max(A_total - A_subcool, 1e-9)
+
+            main_weight = (Q_desuperheat_req * R_desuperheat) + (Q_latent_req * R_condense)
+            if main_weight > 0:
+                A_desuperheat = A_remaining * (Q_desuperheat_req * R_desuperheat) / main_weight
+                A_condense = A_remaining * (Q_latent_req * R_condense) / main_weight
+            else:
+                A_desuperheat = A_remaining * 0.20
+                A_condense = A_remaining * 0.80
+
+            # Final normalize
+            A_sum2 = A_desuperheat + A_condense + A_subcool
+            if abs(A_sum2 - A_total) > 1e-6:
+                A_desuperheat *= A_total / A_sum2
+                A_condense *= A_total / A_sum2
+                A_subcool *= A_total / A_sum2
+
+            self.warnings.append(
+                f"Zoned condenser enabled: reserved {f_sc*100:.0f}% of bundle area for subcooling "
+                f"(A_subcool={A_subcool:.2f} m²)."
+            )
+# Secondary fluid heat capacity rate
         C_water = m_dot_sec_kg * sec_props["cp"] if sec_props["cp"] > 0 else 1e-9
 
         # Achievable heat duties via ε-NTU per zone (counterflow approx), applied sequentially
@@ -3209,6 +3260,48 @@ def create_input_section():
         else:
             st.sidebar.markdown('<span class="condenser-badge">Condenser - Refrigerant in Tubes</span>', unsafe_allow_html=True)
     
+        # Advanced zoned condenser (integral subcooler) – single page toggle
+        # This does NOT change thermal correlations; it only allocates available area to zones more realistically.
+        if inputs.get("condenser_refrigerant_side", "shell") == "shell":
+            st.sidebar.subheader("🧩 Advanced: Zoned Condenser (Integral Subcooler)")
+            inputs["zoned_condenser_enabled"] = st.sidebar.checkbox(
+                "Enable zoned model (allocate dedicated subcool area)",
+                value=False,
+                help="When enabled, a portion of the bundle area/rows is reserved for subcooling. "
+                     "This helps avoid the misleading case where total kW looks OK but subcooling fails."
+            )
+
+            if inputs["zoned_condenser_enabled"]:
+                method = st.sidebar.selectbox(
+                    "Allocation method",
+                    ["Area fraction (simple)", "Row-based (top/bottom concept)"],
+                    help="Area fraction is the fastest and most robust. Row-based approximates which rows see colder water first."
+                )
+                inputs["zoned_condenser_method"] = "area_fraction" if method.startswith("Area") else "row_based"
+
+                if inputs["zoned_condenser_method"] == "area_fraction":
+                    inputs["subcool_area_fraction"] = st.sidebar.slider(
+                        "Subcooler area fraction of total bundle",
+                        min_value=0.05, max_value=0.60, value=0.20, step=0.01,
+                        help="Fraction of total tube outside area reserved for subcooling section."
+                    )
+                else:
+                    inputs["water_entry_location"] = st.sidebar.selectbox(
+                        "Water entry location (for row concept)",
+                        ["Top", "Bottom", "Side"],
+                        help="Used for guidance text (which rows are coldest first). Thermal model uses row fraction."
+                    )
+                    inputs["estimated_tubes_per_row"] = st.sidebar.number_input(
+                        "Estimated tubes per row (for row-based allocation)",
+                        min_value=1, max_value=500, value=25, step=1,
+                        help="Approximate tubes in one row across the shell. Used only to estimate total rows."
+                    )
+                    inputs["subcool_rows"] = st.sidebar.number_input(
+                        "Rows reserved for subcooling",
+                        min_value=1, max_value=200, value=4, step=1,
+                        help="Top/bottom rows (depending on water entry) reserved for subcooling."
+                    )
+
     st.sidebar.markdown("---")
     
     # TEMA Class Selection
