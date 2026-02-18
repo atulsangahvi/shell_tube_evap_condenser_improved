@@ -154,11 +154,13 @@ class IntegratedProfessionalDXCondenser:
         col1, col2 = st.columns([2, 1])
         
         with col1:
+            total_rec = req['desuperheat_rows'] + req['condensing_rows'] + req['subcooling_rows']
+            
             total_rows = st.number_input(
                 "Total Number of Rows",
                 value=int(total_rec),
-                min_value=10,
-                max_value=100,
+                min_value=int(max(3, total_rec * 0.5)),  # Dynamic minimum: at least 3, or half of recommended
+                max_value=int(total_rec * 3),  # Allow up to 3x recommended
                 step=1,
                 help="Total rows in tube bundle"
             )
@@ -166,24 +168,24 @@ class IntegratedProfessionalDXCondenser:
             desuperheat_rows = st.number_input(
                 "Rows for Desuperheat Zone",
                 value=int(req['desuperheat_rows']),
-                min_value=1,
-                max_value=total_rows-2,
+                min_value=0,  # Allow 0 if no desuperheat needed
+                max_value=total_rows,
                 step=1
             )
             
             condensing_rows = st.number_input(
                 "Rows for Condensing Zone",
                 value=int(req['condensing_rows']),
-                min_value=1,
-                max_value=total_rows-2,
+                min_value=1,  # Must have at least 1 row for condensing
+                max_value=total_rows,
                 step=1
             )
             
             subcooling_rows = st.number_input(
                 "Rows for Subcooling Zone",
                 value=int(req['subcooling_rows']),
-                min_value=1,
-                max_value=total_rows-2,
+                min_value=0,  # Allow 0 if no subcooling needed
+                max_value=total_rows,
                 step=1,
                 help="🎯 Increase this to get more subcooling!"
             )
@@ -515,6 +517,9 @@ class IntegratedProfessionalDXCondenser:
         else:
             n_rows_estimate = math.ceil(math.sqrt(n_tubes_total))
         
+        # Ensure minimum rows
+        n_rows_estimate = max(3, n_rows_estimate)
+        
         tubes_per_row_avg = n_tubes_total / n_rows_estimate
         A_row = math.pi * tube_od_m * tube_length * tubes_per_row_avg
         
@@ -536,6 +541,25 @@ class IntegratedProfessionalDXCondenser:
         rows_desuperheat = max(1, math.ceil(A_desuperheat / A_row))
         rows_condensing = max(1, math.ceil(A_condensing / A_row))
         rows_subcooling = max(1, math.ceil(A_subcooling / A_row))
+        
+        # Warning for very small heat exchangers
+        total_rows_needed = rows_desuperheat + rows_condensing + rows_subcooling
+        if total_rows_needed < 5:
+            st.warning(f"""
+            ⚠️ **Very Small Heat Exchanger Detected**
+            
+            Based on your inputs, only {total_rows_needed} rows are needed.
+            
+            This could indicate:
+            - Very low refrigerant flow rate ({m_dot_ref:.3f} kg/s)
+            - Very long tubes ({tube_length:.1f} m)
+            - Too many tubes ({n_tubes_total})
+            
+            Consider:
+            - Reducing tube length
+            - Reducing number of tubes
+            - Increasing refrigerant flow rate
+            """)
         
         return {
             'Q_desuperheat': Q_desuperheat,
